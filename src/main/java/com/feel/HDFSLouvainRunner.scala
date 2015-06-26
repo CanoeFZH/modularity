@@ -1,7 +1,7 @@
-package com.feel
+package com.graph
 
 /**
- * Created by canoe on 6/24/15.
+ * Created by canoe on 6/25/15.
  */
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx._
@@ -26,7 +26,8 @@ class HDFSLouvainRunner(minProgress:Int,progressCounter:Int,outputdir:String) ex
     println(s"qValue: $q")
 
     // overwrite the q values at each level
-    sc.parallelize(qValues, 1).saveAsTextFile(outputdir+"/qvalues")
+    sc.parallelize(qValues, 1).saveAsTextFile(outputdir + "level_" + level + "/qvalues")
   }
 
 }
+
