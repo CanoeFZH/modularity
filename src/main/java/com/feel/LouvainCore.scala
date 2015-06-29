@@ -104,10 +104,10 @@ object LouvainCore {
         vdata.communitySigmaTot = communityTuple._2
         (vid,vdata)
       })
-      updatedVerts.count()
-      labeledVerts.unpersist(blocking = false)
-      communtiyUpdate.unpersist(blocking=false)
-      communityMapping.unpersist(blocking=false)
+      //updatedVerts.count()
+      //labeledVerts.unpersist(blocking = false)
+      //communtiyUpdate.unpersist(blocking=false)
+      //communityMapping.unpersist(blocking=false)
 
       val prevG = louvainGraph
       louvainGraph = louvainGraph.outerJoinVertices(updatedVerts)((vid, old, newOpt) => newOpt.getOrElse(old))
@@ -117,9 +117,9 @@ object LouvainCore {
       msgRDD = louvainGraph.mapReduceTriplets(sendMsg, mergeMsg).cache()
       activeMessages = msgRDD.count()  // materializes the graph by forcing computation
 
-      oldMsgs.unpersist(blocking=false)
-      updatedVerts.unpersist(blocking=false)
-      prevG.unpersistVertices(blocking=false)
+      //oldMsgs.unpersist(blocking=false)
+      //updatedVerts.unpersist(blocking=false)
+      //prevG.unpersistVertices(blocking=false)
 
       // half of the communites can swtich on even cycles
       // and the other half on odd cycles (to prevent deadlocks)
@@ -304,14 +304,12 @@ object LouvainCore {
       data.nodeWeight = weight
       data
     })
-    louvainGraph.vertices.count()
-    louvainGraph.triplets.count() // materialize the graph
+    //louvainGraph.vertices.count()
+    //louvainGraph.triplets.count() // materialize the graph
 
-    newVerts.unpersist(blocking=false)
-    edges.unpersist(blocking=false)
+    //newVerts.unpersist(blocking=false)
+    //edges.unpersist(blocking=false)
     return louvainGraph
-
-
 
   }
 
