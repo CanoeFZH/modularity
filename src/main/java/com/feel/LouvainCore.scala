@@ -65,7 +65,7 @@ object LouvainCore {
    * (without compressing the graph)
    */
   def louvain(sc:SparkContext, graph:Graph[VertexState,Long], minProgress:Int=1,progressCounter:Int=1) : (Double,Graph[VertexState,Long],Int)= {
-    var louvainGraph = graph.cache()
+    var louvainGraph = graph
     val graphWeight = louvainGraph.vertices.values.map(vdata=> vdata.internalWeight+vdata.nodeWeight).reduce(_+_)
     var totalGraphWeight = sc.broadcast(graphWeight)
     println("totalEdgeWeight: "+totalGraphWeight.value)
