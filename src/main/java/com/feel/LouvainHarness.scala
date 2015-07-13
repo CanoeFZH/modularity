@@ -4,6 +4,7 @@ package com.feel
  * Created by canoe on 6/24/15.
  */
 
+import breeze.numerics.abs
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.graphx._
@@ -47,6 +48,7 @@ class  LouvainHarness(minProgress:Int,progressCounter:Int) {
     var level = -1  // number of times the graph has been compressed
     var q = -1.0    // current modularity value
     var halt = false
+    var iter = 0
     do {
       level += 1
       println(s"\nStarting Louvain level $level")
@@ -61,9 +63,10 @@ class  LouvainHarness(minProgress:Int,progressCounter:Int) {
       // If modularity was increased by at least 0.001 compress the graph and repeat
       // halt immediately if the community labeling took less than 3 passes
       //println(s"if ($passes > 2 && $currentQ > $q + 0.001 )")
-      if (passes > 2 && currentQ > q + 0.001 ){
+      if (passes > 2 && currentQ > q + 0.000001 ){
         q = currentQ
         louvainGraph = LouvainCore.compressGraph(louvainGraph)
+        iter += 1
       }
       else {
         halt = true

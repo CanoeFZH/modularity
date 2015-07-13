@@ -1,7 +1,7 @@
-package com.graph
+package com.feel
 
 /**
- * Created by canoe on 6/25/15.
+ * Created by canoe on 6/24/15.
  */
 
 import org.apache.spark.SparkContext
@@ -65,8 +65,8 @@ object LouvainCore {
    * (without compressing the graph)
    */
   def louvain(sc:SparkContext, graph:Graph[VertexState,Long], minProgress:Int=1,progressCounter:Int=1) : (Double,Graph[VertexState,Long],Int)= {
-    var louvainGraph = graph
-    val graphWeight = louvainGraph.vertices.values.map(vdata=> vdata.internalWeight+vdata.nodeWeight).reduce(_+_)
+    var louvainGraph = graph.cache()
+    val graphWeight = louvainGraph.vertices.values.filter(_ != null).map(vdata=> vdata.internalWeight+vdata.nodeWeight).reduce (_+_)
     var totalGraphWeight = sc.broadcast(graphWeight)
     println("totalEdgeWeight: "+totalGraphWeight.value)
 
@@ -104,22 +104,23 @@ object LouvainCore {
         vdata.communitySigmaTot = communityTuple._2
         (vid,vdata)
       })
-      //updatedVerts.count()
-      //labeledVerts.unpersist(blocking = false)
-      //communtiyUpdate.unpersist(blocking=false)
-      //communityMapping.unpersist(blocking=false)
+      updatedVerts.count()
+      labeledVerts.unpersist(blocking = false)
+      communtiyUpdate.unpersist(blocking=false)
+      communityMapping.unpersist(blocking=false)
 
       val prevG = louvainGraph
       louvainGraph = louvainGraph.outerJoinVertices(updatedVerts)((vid, old, newOpt) => newOpt.getOrElse(old))
+      louvainGraph
 
       // gather community information from each vertex's local neighborhood
       val oldMsgs = msgRDD
       msgRDD = louvainGraph.mapReduceTriplets(sendMsg, mergeMsg).cache()
       activeMessages = msgRDD.count()  // materializes the graph by forcing computation
 
-      //oldMsgs.unpersist(blocking=false)
-      //updatedVerts.unpersist(blocking=false)
-      //prevG.unpersistVertices(blocking=false)
+      oldMsgs.unpersist(blocking=false)
+      updatedVerts.unpersist(blocking=false)
+      prevG.unpersistVertices(blocking=false)
 
       // half of the communites can swtich on even cycles
       // and the other half on odd cycles (to prevent deadlocks)
@@ -133,11 +134,8 @@ object LouvainCore {
       }
 
 
-    } while ( stop <= progressCounter && (even ||   (updated > 0 && count < maxIter)))
-    println("\nCompleted in "+count+" cycles")
-
-
-    // Use each vertex's neighboring community data to calculate the global modularity of the graph
+    }  while ( stop <= progressCounter && (even ||   (updated > 0 && count < maxIter)))
+    println("\nCompleted in "+count+" cycles") // Use each vertex's neighboring community data to calculate the global modularity of the graph
     val newVerts = louvainGraph.vertices.innerJoin(msgRDD)((vid,vdata,msgs)=> {
       // sum the nodes internal weight and all of its edges that are in its community
       val community = vdata.community
@@ -299,17 +297,23 @@ object LouvainCore {
     // fill in the weighted degree of each node
     // val louvainGraph = compressedGraph.joinVertices(nodeWeights)((vid,data,weight)=> {
     val louvainGraph = compressedGraph.outerJoinVertices(nodeWeights)((vid,data,weightOption)=> {
-      val weight = weightOption.getOrElse(0L)
-      data.communitySigmaTot = weight +data.internalWeight
-      data.nodeWeight = weight
-      data
+      if (data != null) {
+        val weight = weightOption.getOrElse(0L)
+        data.communitySigmaTot = weight + data.internalWeight
+        data.nodeWeight = weight
+        data
+      } else {
+        null
+      }
     })
-    //louvainGraph.vertices.count()
-    //louvainGraph.triplets.count() // materialize the graph
+    louvainGraph.vertices.count()
+    louvainGraph.triplets.count() // materialize the graph
 
     //newVerts.unpersist(blocking=false)
     //edges.unpersist(blocking=false)
     return louvainGraph
+
+
 
   }
 

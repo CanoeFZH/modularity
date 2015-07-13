@@ -1,7 +1,7 @@
-package com.graph
+package com.feel
 
 /**
- * Created by canoe on 6/25/15.
+ * Created by canoe on 6/24/15.
  */
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.SparkContext._
@@ -15,27 +15,32 @@ object Main {
     val sc = new SparkContext(new SparkConf)
 
     val rawRDD = sc.textFile(args(0))
-      .map(_.split("\t"))
-      .filter(_.length == 3)
+      .distinct(10)
+      .map(row =>
+      row.split("\t")
+      ).filter(_.length == 3)
       .filter(x => x(0).toLong >= 1080 && x(1).toLong >= 1080)
-      .map(x => (x(0), x(1)))
 
-    //val reversedRDD = rawRDD.map(x => (x._2, x._1))
+    val rdd1 = rawRDD.map(x => (x(0) + "\t" + x(1), "A"))
 
-    //val allRDD = reversedRDD.join(rawRDD).filter(x => x._1 == x._2._2).map(x => (x._1, x._2._1))
-    val allRDD = rawRDD
+    val rdd2 = rawRDD.map(x => (x(1) + "\t" + x(0), "B"))
+
+    val allRDD = rdd1.join(rdd2)
+
+    allRDD.map(x => x._1).saveAsTextFile(args(1))
 
     val edgeRDD = allRDD
-      .map(x => new Edge(x._1.toLong, x._2.toLong, 1L))
+      .distinct(10)
+      .map(x => x._1.split("\t"))
+      .map(x => new Edge(x(0).toLong, x(1).toLong, 1L))
 
     val graph = Graph.fromEdges(edgeRDD, None)
 
     val minProgress = 2000
     val progressCounter = 1
-    val outputDir = "/tmp/fanzhihang/graph/"
+    val outputDir = "./"
     val runner = new HDFSLouvainRunner(minProgress, progressCounter, outputDir)
     runner.run(sc, graph)
 
   }
 }
-
