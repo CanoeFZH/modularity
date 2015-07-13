@@ -1,7 +1,7 @@
-package com.feel
+package com.graph
 
 /**
- * Created by canoe on 6/24/15.
+ * Created by canoe on 6/25/15.
  */
 
 import org.apache.spark.SparkContext
@@ -65,7 +65,7 @@ object LouvainCore {
    * (without compressing the graph)
    */
   def louvain(sc:SparkContext, graph:Graph[VertexState,Long], minProgress:Int=1,progressCounter:Int=1) : (Double,Graph[VertexState,Long],Int)= {
-    var louvainGraph = graph.cache()
+    var louvainGraph = graph
     val graphWeight = louvainGraph.vertices.values.map(vdata=> vdata.internalWeight+vdata.nodeWeight).reduce(_+_)
     var totalGraphWeight = sc.broadcast(graphWeight)
     println("totalEdgeWeight: "+totalGraphWeight.value)
@@ -85,43 +85,41 @@ object LouvainCore {
       even = ! even
 
       // label each vertex with its best community based on neighboring community information
-      val labeledVerts = louvainVertJoin(louvainGraph,msgRDD,totalGraphWeight,even).cache()
+      val labeledVerts = louvainVertJoin(louvainGraph,msgRDD,totalGraphWeight,even)
 
       // calculate new sigma total value for each community (total weight of each community)
       val communtiyUpdate = labeledVerts
         .map( {case (vid,vdata) => (vdata.community,vdata.nodeWeight+vdata.internalWeight)})
-        .reduceByKey(_+_).cache()
+        .reduceByKey(_+_)
 
       // map each vertex ID to its updated community information
       val communityMapping = labeledVerts
         .map( {case (vid,vdata) => (vdata.community,vid)})
         .join(communtiyUpdate)
         .map({case (community,(vid,sigmaTot)) => (vid,(community,sigmaTot)) })
-        .cache()
 
       // join the community labeled vertices with the updated community info
       val updatedVerts = labeledVerts.join(communityMapping).map({ case (vid,(vdata,communityTuple) ) =>
         vdata.community = communityTuple._1
         vdata.communitySigmaTot = communityTuple._2
         (vid,vdata)
-      }).cache()
-      updatedVerts.count()
-      labeledVerts.unpersist(blocking = false)
-      communtiyUpdate.unpersist(blocking=false)
-      communityMapping.unpersist(blocking=false)
+      })
+      //updatedVerts.count()
+      //labeledVerts.unpersist(blocking = false)
+      //communtiyUpdate.unpersist(blocking=false)
+      //communityMapping.unpersist(blocking=false)
 
       val prevG = louvainGraph
       louvainGraph = louvainGraph.outerJoinVertices(updatedVerts)((vid, old, newOpt) => newOpt.getOrElse(old))
-      louvainGraph.cache()
 
       // gather community information from each vertex's local neighborhood
       val oldMsgs = msgRDD
       msgRDD = louvainGraph.mapReduceTriplets(sendMsg, mergeMsg).cache()
       activeMessages = msgRDD.count()  // materializes the graph by forcing computation
 
-      oldMsgs.unpersist(blocking=false)
-      updatedVerts.unpersist(blocking=false)
-      prevG.unpersistVertices(blocking=false)
+      //oldMsgs.unpersist(blocking=false)
+      //updatedVerts.unpersist(blocking=false)
+      //prevG.unpersistVertices(blocking=false)
 
       // half of the communites can swtich on even cycles
       // and the other half on odd cycles (to prevent deadlocks)
@@ -276,7 +274,7 @@ object LouvainCore {
       state.internalWeight = weight1+weight2
       state.nodeWeight = 0L
       (vid,state)
-    }).cache()
+    })
 
 
     // translate each vertex edge to a community edge
@@ -285,7 +283,7 @@ object LouvainCore {
       val dst = math.max(et.srcAttr.community,et.dstAttr.community)
       if (src != dst) Iterator(new Edge(src, dst, et.attr))
       else Iterator.empty
-    }).cache()
+    })
 
 
     // generate a new graph where each community of the previous
@@ -305,15 +303,13 @@ object LouvainCore {
       data.communitySigmaTot = weight +data.internalWeight
       data.nodeWeight = weight
       data
-    }).cache()
-    louvainGraph.vertices.count()
-    louvainGraph.triplets.count() // materialize the graph
+    })
+    //louvainGraph.vertices.count()
+    //louvainGraph.triplets.count() // materialize the graph
 
-    newVerts.unpersist(blocking=false)
-    edges.unpersist(blocking=false)
+    //newVerts.unpersist(blocking=false)
+    //edges.unpersist(blocking=false)
     return louvainGraph
-
-
 
   }
 
